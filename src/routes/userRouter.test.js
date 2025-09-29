@@ -19,4 +19,4 @@ const { randomName } = require('../testUtility');
 //     const authRes = await request(app).get('/api/user/me').set('Authorization', `Bearer ${updateRes.body.token}`);
 //     expect(authRes.status).toBe(200);
 //     expect(authRes.body.name).toBe(newName);
-})
+// })

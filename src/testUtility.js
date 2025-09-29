@@ -10,3 +10,9 @@ async function createAdminUser() {
 
   return user;
 }
+
+function randomName() {
+    return `testUser${Math.random().toString(36).substring(2, 12)}`;
+}
+
+module.exports = { createAdminUser, randomName };

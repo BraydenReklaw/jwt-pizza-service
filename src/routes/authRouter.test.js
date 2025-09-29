@@ -1,9 +1,6 @@
 const request = require('supertest');
 const app = require('../service');
-
-function randomName() {
-    return `testUser${Math.random().toString(36).substring(2, 12)}`;
-}
+const randomName = require('../testUtility').randomName;``
 
 test('register fails with missing field', async () => {
     const testUser = { name: `${randomName()}`, email: 'test@test.com', password: ''};

@@ -1,18 +1,27 @@
 const request = require('supertest');
 const app = require('../service');
 const { DB } = require('./database.js');
+const { createAdminUser } = require('../testUtility');
+
 
 let origGetConnection;
 let origQuery;
+let testAdmin
+let testAdminAuthToken;
 
 beforeAll(async () => {
     origGetConnection = DB.getConnection;
     origQuery = DB.query;
+    testAdmin = await createAdminUser();
+    const LoginRes = await request(app).put('/api/auth').send(testAdmin);
+    testAdminAuthToken = LoginRes.body.token;
 })
 
 afterAll(async () => {
     DB.getConnection = origGetConnection;
     DB.query = origQuery;
+    await request(app).delete('/api/auth').set('Authorization', `Bearer ${testAdminAuthToken}`);
+
 })
 
 test("get menu" , async () => {
@@ -39,7 +48,18 @@ test("add user", async () => {
     const newUser = { name: 'testUser', email: 'test@test.com', password: 'testpassword', roles: [{ role: 'diner' }] };
     DB.getConnection = jest.fn().mockResolvedValue({ end: jest.fn() });
     DB.query = jest.fn().mockResolvedValue({ insertId: 1234 });
-    const res = await DB.addUser(newUser);
+    await DB.addUser(newUser);
     expect(DB.getConnection).toHaveBeenCalled();
     expect(DB.query).toHaveBeenCalledTimes(2);
 })
+
+test("get user", async () => {
+    DB.getConnection = origGetConnection;
+    DB.query = origQuery;
+    const res = await DB.getUser(testAdmin.email, "toomanysecrets");
+    expect(res).toHaveProperty('id', expect.any(Number));
+    expect(res).toHaveProperty('email', testAdmin.email);
+    expect(Array.isArray(res.roles)).toBe(true);
+    expect(res.password).toBeUndefined();
+})
+

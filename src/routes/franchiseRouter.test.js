@@ -52,7 +52,7 @@ test('create franchise (unauthorized)', async () => {
     const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
     testUser.email = Math.random().toString(36).substring(2, 12) + '@test.com';
     const registerRes = await request(app).post('/api/auth').send(testUser);
-    testUserAuthToken = registerRes.body.token;
+    const testUserAuthToken = registerRes.body.token;
     const newFranchise = { name: 'Test Franchise', userId: 1 };
     const res = await request(app).post('/api/franchise').send(newFranchise).set('Authorization', `Bearer ${testUserAuthToken}`);
     expect(res.status).toBe(403);

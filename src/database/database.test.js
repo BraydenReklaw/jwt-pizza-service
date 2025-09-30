@@ -8,12 +8,14 @@ let origGetConnection;
 let origQuery;
 let testAdmin
 let testAdminAuthToken;
+let testAdminId;
 
 beforeAll(async () => {
     origGetConnection = DB.getConnection;
     origQuery = DB.query;
     testAdmin = await createAdminUser();
     const LoginRes = await request(app).put('/api/auth').send(testAdmin);
+    testAdminId = LoginRes.body.user.id;
     testAdminAuthToken = LoginRes.body.token;
 })
 
@@ -61,5 +63,31 @@ test("get user", async () => {
     expect(res).toHaveProperty('email', testAdmin.email);
     expect(Array.isArray(res.roles)).toBe(true);
     expect(res.password).toBeUndefined();
+    //reset DB functions
+    origGetConnection = DB.getConnection;
+    origQuery = DB.query;
 })
 
+// generated partially with AI
+test("update user", async () => {
+    // restore real DB helpers so we operate on the testAdmin created in beforeAll
+    DB.getConnection = origGetConnection;
+    DB.query = origQuery;
+
+    const newName = `updated_${Date.now()}`;
+    const newEmail = `updated_${Date.now()}@test.com`;
+    const newPassword = 'newpassword';
+
+    const res = await DB.updateUser(testAdminId, newName, newEmail, newPassword);
+
+    expect(res).toHaveProperty('id', testAdminId);
+    expect(res).toHaveProperty('name', newName);
+    expect(res).toHaveProperty('email', newEmail);
+    expect(Array.isArray(res.roles)).toBe(true);
+    // updateUser should not return the password
+    expect(res.password).toBeUndefined();
+
+    // preserve current DB helpers in the same pattern used elsewhere in this file
+    origGetConnection = DB.getConnection;
+    origQuery = DB.query;
+})

@@ -1,7 +1,8 @@
 const request = require('supertest');
 const app = require('../service');
-const { DB } = require('./database.js');
+const { DB, Role} = require('./database.js');
 const { createAdminUser } = require('../testUtility');
+
 
 
 let origGetConnection;
@@ -150,4 +151,114 @@ test("add diner order", async () => {
     );
 
     expect(result).toEqual({ ...testOrder, id: 123 });
+});
+
+test("create franchise", async () => {
+  const mockEnd = jest.fn();
+  const mockConnection = { end: mockEnd };
+
+  const testFranchise = {
+    name: "Test Franchise",
+    admins: [
+      { email: "admin1@example.com" },
+      { email: "admin2@example.com" }
+    ]
+  };
+
+  // Mock DB.getConnection
+  DB.getConnection = jest.fn().mockResolvedValue(mockConnection);
+
+  // Mock DB.query sequence:
+  // 1. SELECT for admin1
+  // 2. SELECT for admin2
+  // 3. INSERT into franchise
+  // 4. INSERT userRole for admin1
+  // 5. INSERT userRole for admin2
+  DB.query = jest.fn()
+    .mockResolvedValueOnce([{ id: 101, name: "Admin One" }])  // admin1
+    .mockResolvedValueOnce([{ id: 102, name: "Admin Two" }])  // admin2
+    .mockResolvedValueOnce({ insertId: 999 })                 // franchise insert
+    .mockResolvedValueOnce({})                                // userRole admin1
+    .mockResolvedValueOnce({});                               // userRole admin2
+
+  const result = await DB.createFranchise(testFranchise);
+
+  expect(DB.getConnection).toHaveBeenCalled();
+  expect(DB.query).toHaveBeenCalledTimes(5);
+  expect(mockEnd).toHaveBeenCalled();
+
+  expect(DB.query).toHaveBeenCalledWith(
+    mockConnection,
+    'SELECT id, name FROM user WHERE email=?',
+    ['admin1@example.com']
+  );
+
+  expect(DB.query).toHaveBeenCalledWith(
+    mockConnection,
+    'SELECT id, name FROM user WHERE email=?',
+    ['admin2@example.com']
+  );
+
+  expect(DB.query).toHaveBeenCalledWith(
+    mockConnection,
+    'INSERT INTO franchise (name) VALUES (?)',
+    ['Test Franchise']
+  );
+
+  expect(DB.query).toHaveBeenCalledWith(
+    mockConnection,
+    'INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)',
+    [101, Role.Franchisee, 999]
+  );
+
+  expect(DB.query).toHaveBeenCalledWith(
+    mockConnection,
+    'INSERT INTO userRole (userId, role, objectId) VALUES (?, ?, ?)',
+    [102, Role.Franchisee, 999]
+  );
+
+  expect(result).toEqual({
+    name: "Test Franchise",
+    id: 999,
+    admins: [
+      { email: "admin1@example.com", id: 101, name: "Admin One" },
+      { email: "admin2@example.com", id: 102, name: "Admin Two" }
+    ]
+  });
+});
+
+test("delete franchise", async () => {
+  const mockEnd = jest.fn();
+  const mockBeginTransaction = jest.fn();
+  const mockCommit = jest.fn();
+  const mockRollback = jest.fn();
+
+  const mockConnection = {
+    end: mockEnd,
+    beginTransaction: mockBeginTransaction,
+    commit: mockCommit,
+    rollback: mockRollback
+  };
+
+  const franchiseId = 555;
+
+  // Mock DB.getConnection
+  DB.getConnection = jest.fn().mockResolvedValue(mockConnection);
+
+  // Mock DB.query for the three DELETE statements
+  DB.query = jest.fn()
+    .mockResolvedValueOnce({}) // DELETE FROM store
+    .mockResolvedValueOnce({}) // DELETE FROM userRole
+    .mockResolvedValueOnce({}); // DELETE FROM franchise
+
+  await DB.deleteFranchise(franchiseId);
+
+  expect(DB.getConnection).toHaveBeenCalled();
+  expect(mockBeginTransaction).toHaveBeenCalled();
+  expect(DB.query).toHaveBeenCalledTimes(3);
+  expect(DB.query).toHaveBeenCalledWith(mockConnection, 'DELETE FROM store WHERE franchiseId=?', [franchiseId]);
+  expect(DB.query).toHaveBeenCalledWith(mockConnection, 'DELETE FROM userRole WHERE objectId=?', [franchiseId]);
+  expect(DB.query).toHaveBeenCalledWith(mockConnection, 'DELETE FROM franchise WHERE id=?', [franchiseId]);
+  expect(mockCommit).toHaveBeenCalled();
+  expect(mockEnd).toHaveBeenCalled();
 });

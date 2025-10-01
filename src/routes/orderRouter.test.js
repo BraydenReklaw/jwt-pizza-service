@@ -87,7 +87,7 @@ test('getOrders', async () => {
   // Override methods
     DB.getConnection = () => Promise.resolve(mockConnection);
     DB.getOffset = () => 0;
-    DB.query = (conn, sql, params) => {
+    DB.query = (conn, sql) => {
         if (sql.includes('FROM dinerOrder')) {
             return Promise.resolve(mockOrders);
         }

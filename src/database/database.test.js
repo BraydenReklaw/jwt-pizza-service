@@ -91,3 +91,63 @@ test("update user", async () => {
     origGetConnection = DB.getConnection;
     origQuery = DB.query;
 })
+
+test("add diner order", async () => {
+    const mockEnd = jest.fn();
+    const mockConnection = { end: mockEnd };
+
+    const testUser = { id: 42 };
+    const testOrder = {
+        franchiseId: 7,
+        storeId: 3,
+        items: [
+            { menuId: 'pepperoni', description: 'Spicy slice', price: 9.99 },
+            { menuId: 'veggie', description: 'Green and clean', price: 8.49 }
+        ]
+    };
+
+  // Mock DB.getConnection
+    DB.getConnection = jest.fn().mockResolvedValue(mockConnection);
+
+  // Track calls to DB.query
+    const queryMock = jest.fn()
+    // First call: insert into dinerOrder
+        .mockResolvedValueOnce({ insertId: 123 })
+    // Second call: insert first orderItem
+        .mockResolvedValueOnce({})
+    // Third call: insert second orderItem
+        .mockResolvedValueOnce({});
+    DB.query = queryMock;
+
+  // Mock DB.getID
+    DB.getID = jest.fn()
+        .mockResolvedValueOnce(101) // pepperoni
+        .mockResolvedValueOnce(102); // veggie
+
+    const result = await DB.addDinerOrder(testUser, testOrder);
+
+    expect(DB.getConnection).toHaveBeenCalled();
+    expect(DB.query).toHaveBeenCalledTimes(3);
+    expect(DB.getID).toHaveBeenCalledTimes(2);
+    expect(mockEnd).toHaveBeenCalled();
+
+    expect(DB.query).toHaveBeenCalledWith(
+        mockConnection,
+        'INSERT INTO dinerOrder (dinerId, franchiseId, storeId, date) VALUES (?, ?, ?, now())',
+        [testUser.id, testOrder.franchiseId, testOrder.storeId]
+    );
+
+    expect(DB.query).toHaveBeenCalledWith(
+        mockConnection,
+        'INSERT INTO orderItem (orderId, menuId, description, price) VALUES (?, ?, ?, ?)',
+        [123, 101, 'Spicy slice', 9.99]
+    );
+
+    expect(DB.query).toHaveBeenCalledWith(
+        mockConnection,
+        'INSERT INTO orderItem (orderId, menuId, description, price) VALUES (?, ?, ?, ?)',
+        [123, 102, 'Green and clean', 8.49]
+    );
+
+    expect(result).toEqual({ ...testOrder, id: 123 });
+});

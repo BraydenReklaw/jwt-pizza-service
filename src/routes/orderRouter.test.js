@@ -69,19 +69,48 @@ test('createOrder', async () => {
 })
 
 test('getOrders', async () => {
-    const origGetOrders = DB.getOrders;
+    const origGetConnection = DB.getConnection;
+    const origGetOffset = DB.getOffset;
+    const origQuery = DB.query;
 
-    const fakeOrders = [
-      { id: 1, franchiseId: 1, storeId: 1, items: [{ menuId: 1, description: 'Veggie', price: 0.05 }], createdAt: Date.now() }
+    // Mock connection
+    const mockConnection = { end: jest.fn() };
+
+  // Mock data
+    const mockOrders = [
+    { id: 1, franchiseId: 1, storeId: 1, date: '2025-09-30' }
+        ];
+    const mockItems = [
+        { id: 1, menuId: 1, description: 'Veggie', price: 0.05 }
     ];
 
-    DB.getOrders = jest.fn().mockResolvedValue(fakeOrders);
+  // Override methods
+    DB.getConnection = () => Promise.resolve(mockConnection);
+    DB.getOffset = () => 0;
+    DB.query = (conn, sql, params) => {
+        if (sql.includes('FROM dinerOrder')) {
+            return Promise.resolve(mockOrders);
+        }
+        if (sql.includes('FROM orderItem')) {
+            return Promise.resolve(mockItems);
+        }
+            return Promise.resolve([]);
+    };
 
-    const res = await request(app).get('/api/order').set('Authorization', `Bearer ${testAdminAuthToken}`)
-    expect(res.status).toBe(200);
+  // Run actual getOrders
+    const user = { id: 123 };
+    const result = await DB.getOrders(user, 1);
 
-    expect(DB.getOrders).toHaveBeenCalled();
-    expect(res.body).toEqual(fakeOrders);
+  // Assertions
+    expect(result).toEqual({
+        dinerId: user.id,
+        orders: [{ ...mockOrders[0], items: mockItems }],
+        page: 1
+    });
+    expect(mockConnection.end).toHaveBeenCalled();
 
-    DB.getOrders = origGetOrders;
+  // Restore original methods
+    DB.getConnection = origGetConnection;
+    DB.getOffset = origGetOffset;
+    DB.query = origQuery;
 })

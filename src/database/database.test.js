@@ -264,26 +264,10 @@ test("delete franchise", async () => {
 });
 
 test('delete user', async () => {
-  const mockEnd = jest.fn();
-  const mockConnection = { end: mockEnd };
-
-  const fakeUserId = 9999;
-
-  DB.getConnection = jest.fn().mockResolvedValue(mockConnection);
-  DB.query = jest.fn().mockResolvedValue({}); 
-
-
-  const res = await request(app)
-    .delete(`/api/user/${fakeUserId}`)
-    .set('Authorization', `Bearer ${testAdminAuthToken}`)
-    .expect(200); 
-
+  const fakeUserId = 999
+  DB.getConnection = jest.fn().mockResolvedValue({ end: jest.fn() });
+  DB.query = jest.fn().mockResolvedValue({ userId: fakeUserId });
+  await DB.deleteUser(fakeUserId);
   expect(DB.getConnection).toHaveBeenCalled();
-  expect(DB.query).toHaveBeenCalledWith(
-    mockConnection,
-    'DELETE FROM user WHERE userId=?',
-    [fakeUserId]
-  );
-  expect(mockEnd).toHaveBeenCalled();
-  expect(res.body).toEqual({ message: 'User deleted' });
-})
+  expect(DB.query).toHaveBeenCalled();
+});

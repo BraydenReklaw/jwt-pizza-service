@@ -17,6 +17,11 @@ test('list users', async () => {
   expect(listUsersRes.body.users.length).toBeGreaterThan(0);
 });
 
+test('delete unathorized', async() => {
+  const deleteRes = await request(app).delete('/api/user/:userId')
+  expect(deleteRes.status).toBe(401);
+})
+
 async function registerUser(service) {
   const testUser = {
     name: 'pizza diner',

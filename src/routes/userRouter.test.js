@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../service');
+const { DB } = require('../database/database.js')
 
 test('list users unauthorized', async () => {
   const listUsersRes = await request(app).get('/api/user');
@@ -17,9 +18,29 @@ test('list users', async () => {
   expect(listUsersRes.body.users.length).toBeGreaterThan(0);
 });
 
-test('delete unathorized', async() => {
+test('delete unathorized', async () => {
   const deleteRes = await request(app).delete('/api/user/:userId')
   expect(deleteRes.status).toBe(401);
+})
+
+test('delete fake user', async () => {
+  // First, register a user so we have a token
+  const [user, token] = await registerUser(request(app));
+
+  // Mock DB.deleteUser so it doesn't touch the real DB
+  const deleteUserMock = jest.spyOn(DB, 'deleteUser').mockResolvedValue();
+
+  const deleteRes = await request(app)
+    .delete(`/api/user/${user.id}`)
+    .set('Authorization', `Bearer ${token}`);
+
+  // Assertions
+  expect(deleteRes.status).toBe(200);
+  expect(deleteRes.body).toEqual({ message: 'User deleted' });
+  expect(deleteUserMock).toHaveBeenCalledWith(user.id);
+
+  // Restore the original function
+  deleteUserMock.mockRestore();
 })
 
 async function registerUser(service) {

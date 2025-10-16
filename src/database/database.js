@@ -80,10 +80,10 @@ class DB {
     try {
       const offset = (page - 1) * limit;
       nameFilter = nameFilter.replace(/\*/g, '%');
-      let users = await this.query(connection, `SELECT id, name, email FROM user WHERE name LIKE ? ORDER BY id LIMIT ? OFFSET ?`, [nameFilter, limit + 1, offset]);
+      let users = await this.query(connection, `SELECT * FROM user WHERE name LIKE ? LIMIT ${limit} OFFSET ${offset}`, [nameFilter]);
       const more = users.length > limit;
       if (more) {
-        user = user.slice(0, limit);
+        users = users.slice(0, limit);
       }
       for (const user of users) {
         const roles = await this.query(connection, `SELECT role FROM userRole WHERE userId=?`, [user.id]);

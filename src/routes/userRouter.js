@@ -89,8 +89,11 @@ userRouter.put(
 
 userRouter.delete(
   '/:userId',
+  authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    res.json({});
+    const UserId = Number(req.params.UserId);
+    await DB.deleteFranchise(UserId);
+    res.json({ message: 'User deleted' });
   })
 )
 

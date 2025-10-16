@@ -262,3 +262,6 @@ test("delete franchise", async () => {
   expect(mockCommit).toHaveBeenCalled();
   expect(mockEnd).toHaveBeenCalled();
 });
+
+test('delete user', async () => {
+})

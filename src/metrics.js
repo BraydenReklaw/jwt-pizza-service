@@ -41,3 +41,69 @@ function requestTracker(req, res, next) {
 
     next();
 }
+
+function recordAuthAttempt(success) {
+    if (success) authSuccess += 1;
+    else authFailure += 1;
+}
+
+function trackActiveUserAdd(userId) {
+    if (userId != null) activeUsers.add(String(userId));
+}
+
+function trackActiveUserRemove(userId) {
+    if (userId != null) activeUsers.delete(String(userId));
+}
+
+function recordPizzaPurchase(success, latencyMs = 0, price = 0) {
+    if (success) {
+        pizzasSold += 1;
+        const cents = Math.round(price * 100) || 0;
+        revenueCents += cents;
+    } else {
+        creationFailures += 1;
+    }
+
+    recordLatency('[FACTORY] /api/order/verify', latencyMs)
+}
+
+function getCpuUsagePercentage() {
+    const load = os.loadavg()[0] || 0;
+    const cpus = os.cpus().length || 1;
+    return Number(((load / cpus) * 100).toFized(2));
+}
+
+function getMemoryUsagePercentage() {
+    const total = os.totalmem() || 1;
+    const free = os.freemem() || 0;
+    const used = total - free;
+    return Number(((used / total)* 100).toFixed(2))
+}
+
+function createMetric(name, balue, unit, type, valueKey, attributes = {}) {
+    attributes = { ...attributes, source: config.source || 'service'};
+    const metric = {
+        name,
+        unit,
+        [type]: {
+            dataPoints: [
+                {
+                    [valueKey]: valueKey,
+                    timeUnixNano: Date.now() * 1e6,
+                    attributes: [],
+                },
+            ],
+        },
+    };
+    Object.keys(attributes).forEach((k) => {
+        metric[type].dataPoints[0].attributes.push({
+            key: k,
+            value: { stringValue: String(attributes[k]) },
+        });
+    });
+    if (type === 'sum') {
+        metric[type].aggregationTemporality = 'AGGREGATION_TEMPORALITY_CUMULATIVE';
+        metric[type].isMonotonic = true;
+    }
+    return metric;
+}

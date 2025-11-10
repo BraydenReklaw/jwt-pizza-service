@@ -80,7 +80,7 @@ function getMemoryUsagePercentage() {
     return Number(((used / total)* 100).toFixed(2))
 }
 
-function createMetric(name, balue, unit, type, valueKey, attributes = {}) {
+function createMetric(name, value, unit, type, valueKey, attributes = {}) {
     attributes = { ...attributes, source: config.source || 'service'};
     const metric = {
         name,
@@ -88,7 +88,7 @@ function createMetric(name, balue, unit, type, valueKey, attributes = {}) {
         [type]: {
             dataPoints: [
                 {
-                    [valueKey]: valueKey,
+                    [valueKey]: value,
                     timeUnixNano: Date.now() * 1e6,
                     attributes: [],
                 },
@@ -106,4 +106,38 @@ function createMetric(name, balue, unit, type, valueKey, attributes = {}) {
         metric[type].isMonotonic = true;
     }
     return metric;
+}
+
+function gatherMetrics() {
+    const metrics = [];
+
+    metrics.push(createMetric('requests_total', totalRequest, '1', 'sum', 'asInt'));
+    Object.keys(requestsByMethod).forEach((m) => {
+        metrics.push(createMetric('requests_by_method', requestsByMethod[m], '1', 'sum', 'asInt', {method: m}));
+    });
+    Object.keys(requestsByEndpoint).forEach((ep) => {
+        metrics.push(createMetric('requests_by_endpint', requestsByEndpoint[ep], '1', 'sum', 'asInt', {endpoint: ep}));    
+    });
+
+    metrics.push(createMetric('auth_success', authSuccess, '1', 'sum', 'asInt'));
+    metrics.push(createMetric('auth_failure', authFailure, '1', 'sum', 'asInt'));
+    
+    metrics.push(createMetric('active_users', activeUsers.size, '1', 'gauge', 'asInt'));
+
+    metrics.push(createMetric('pizzas_sold', pizzasSold, '1', 'sum','asInt'));
+    metrics.push(createMetric('pizza_failures', creationFailures, '1', 'sum', 'asInt'));
+    metrics.push(createMetric('revenue', revenueCents, 'cents', 'sum', 'asInt'));
+
+    metrics.puch(createMetric('cpu_usage', getCpuUsagePercentage(), 'percent', 'gauge', 'asDouble'));
+    metrics.push(createMetric('memory_usage', getMemoryUsagePercentage(), 'percent', 'guage', 'asDouble'));
+
+    Object.keys(latency).forEach((ep) => {
+        const {sumMs, count, maxMs} = latency[ep];
+        const avg = count > 0 ? Math.round(sumMs / count) : 0;
+        metrics.push(createMetric('Latency_average', avg, 'ms', 'gauge', 'asInt', {endpoint: ep}));
+        metrics.push(createMetric('latency_max', maxMs, 'ms', 'gauge', 'asInt', {endpoint: ep}));
+        metrics.push(createMetric('Latency_count', count, '1', 'sum', 'asInt', {endpoint: ep}));
+    });
+
+    return metrics;
 }

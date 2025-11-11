@@ -17,10 +17,6 @@ function requestTracker(req, res, next) {
     } else {
         methodRequests[req.method] = 1;
     }
-
-    if (req.user && req.user.userId) {
-        activeUsers.add(req.user.userId);
-    }
     next();
 }
 
@@ -32,7 +28,17 @@ function authAttempt(success) {
     }
 }
 
+function trackActiveUserAdd(userId) {
+    if (userId) {
+        activeUsers.add(userId);
+    }
+}
 
+function trackActiveUserRemove(userId) {
+    if (userId) {
+        activeUsers.delete(userId);
+    }   
+}
 
 setInterval(() => {
     const metrics = [];
@@ -115,4 +121,6 @@ function sendMetricToGrafana(metrics) {
 module.exports = {
     requestTracker,
     recordAuthAttempt: authAttempt,
+    trackActiveUserAdd,
+    trackActiveUserRemove
 }

@@ -3,7 +3,7 @@ const config = require('./config');
 
 const requestsByEndpoint = {};
 const requestsByMethod = {GET: 0, POST: 0, PUT: 0, DELETE: 0, OTHER: 0}
-let totalRequests = -0;
+let totalRequests = 0;
 
 let authSuccess = 0;
 let authFailure = 0;
@@ -110,12 +110,12 @@ function createMetric(name, value, unit, type, valueKey, attributes = {}) {
 function gatherMetrics() {
     const metrics = [];
 
-    metrics.push(createMetric('requests_total', totalRequest, '1', 'sum', 'asInt'));
+    metrics.push(createMetric('requests_total', totalRequests, '1', 'sum', 'asInt'));
     Object.keys(requestsByMethod).forEach((m) => {
         metrics.push(createMetric('requests_by_method', requestsByMethod[m], '1', 'sum', 'asInt', {method: m}));
     });
     Object.keys(requestsByEndpoint).forEach((ep) => {
-        metrics.push(createMetric('requests_by_endpint', requestsByEndpoint[ep], '1', 'sum', 'asInt', {endpoint: ep}));    
+        metrics.push(createMetric('requests_by_endpoint', requestsByEndpoint[ep], '1', 'sum', 'asInt', {endpoint: ep}));    
     });
 
     metrics.push(createMetric('auth_success', authSuccess, '1', 'sum', 'asInt'));

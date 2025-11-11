@@ -5,6 +5,7 @@ const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
 
 const authRouter = express.Router();
+const metrics = require('../metrics.js');
 
 authRouter.docs = [
   {
@@ -50,6 +51,7 @@ async function setAuthUser(req, res, next) {
 // Authenticate token
 authRouter.authenticateToken = (req, res, next) => {
   if (!req.user) {
+    metrics.recordAuthAttempt(false);
     return res.status(401).send({ message: 'unauthorized' });
   }
   next();
@@ -74,10 +76,19 @@ authRouter.put(
   '/',
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    const user = await DB.getUser(email, password);
-    const auth = await setAuth(user);
-    res.json({ user: user, token: auth });
-  })
+
+    try {
+      const user = await DB.getUser(email, password);
+      const auth = await setAuth(user);   // success metrics handled inside
+      return res.json({ user, token: auth });
+
+    } catch (err) {
+      metrics.recordAuthAttempt(false);   // failed login (wrong pw, no user, etc.)
+      return res.status(401).json({ message: 'unauthorized' });
+    }
+  }),
+  
+  
 );
 
 // logout
@@ -86,6 +97,7 @@ authRouter.delete(
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
     await clearAuth(req);
+    metrics.trackActiveUserRemove(req.user.id);
     res.json({ message: 'logout successful' });
   })
 );
@@ -93,6 +105,8 @@ authRouter.delete(
 async function setAuth(user) {
   const token = jwt.sign(user, config.jwtSecret);
   await DB.loginUser(user.id, token);
+  metrics.recordAuthAttempt(true);
+  metrics.trackActiveUserAdd(user.id);
   return token;
 }
 

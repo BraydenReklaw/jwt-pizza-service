@@ -8,6 +8,7 @@ const config = require('./config.js');
 
 const app = express();
 app.use(express.json());
+app.use(require('./metrics').requestTracker);
 app.use(setAuthUser);
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');

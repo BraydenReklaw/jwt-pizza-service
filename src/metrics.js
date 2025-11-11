@@ -30,7 +30,7 @@ function requestTracker(req, res, next) {
     totalRequests += 1;
 
     const endpoint = `[${method}] ${req.path}`
-    requestsByEndpoint[endpoint] = (requestsByEndpont[endpoint] || 0) +  1;
+    requestsByEndpoint[endpoint] = (requestsByEndpoint[endpoint] || 0) +  1;
 
     const start = Date.now();
     res.on('finish', () => {
@@ -69,7 +69,7 @@ function recordPizzaPurchase(success, latencyMs = 0, price = 0) {
 function getCpuUsagePercentage() {
     const load = os.loadavg()[0] || 0;
     const cpus = os.cpus().length || 1;
-    return Number(((load / cpus) * 100).toFized(2));
+    return Number(((load / cpus) * 100).toFixed(2));
 }
 
 function getMemoryUsagePercentage() {
@@ -127,8 +127,8 @@ function gatherMetrics() {
     metrics.push(createMetric('pizza_failures', creationFailures, '1', 'sum', 'asInt'));
     metrics.push(createMetric('revenue', revenueCents, 'cents', 'sum', 'asInt'));
 
-    metrics.puch(createMetric('cpu_usage', getCpuUsagePercentage(), 'percent', 'gauge', 'asDouble'));
-    metrics.push(createMetric('memory_usage', getMemoryUsagePercentage(), 'percent', 'guage', 'asDouble'));
+    metrics.push(createMetric('cpu_usage', getCpuUsagePercentage(), 'percent', 'gauge', 'asDouble'));
+    metrics.push(createMetric('memory_usage', getMemoryUsagePercentage(), 'percent', 'gauge', 'asDouble'));
 
     Object.keys(latency).forEach((ep) => {
         const {sumMs, count, maxMs} = latency[ep];
@@ -184,11 +184,10 @@ async function reportAndReset() {
 
 setInterval(reportAndReset, intervalMs);
 
-module.export = {
+module.exports = {
     requestTracker,
     recordAuthAttempt,
     trackActiveUserAdd,
     trackActiveUserRemove,
     recordPizzaPurchase,
-    recordCreationFailure,
 }

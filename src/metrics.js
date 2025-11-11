@@ -1,6 +1,5 @@
 const os = require('os');
 const config = require('./config');
-const { get } = require('http');
 
 const requestsByEndpoint = {};
 const requestsByMethod = {GET: 0, POST: 0, PUT: 0, DELETE: 0, OTHER: 0}
@@ -167,6 +166,7 @@ async function sendMetrics(metrics) {
 const intervalMs = config.metricsInterval || 60 * 1000;
 
 async function reportAndReset() {
+    // console.log('Reporting metrics...');
     try {
         const snapshot = gatherMetrics();
         await sendMetrics(snapshot);

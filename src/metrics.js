@@ -1,6 +1,5 @@
 const os = require('os');
 const config = require('./config');
-const { request } = require('http');
 
 const requestsByEndpoint = {};
 const requestsByMethod = {GET: 0, POST: 0, PUT: 0, DELETE: 0, OTHER: 0}
@@ -140,4 +139,56 @@ function gatherMetrics() {
     });
 
     return metrics;
+}
+
+async function sendMetrics(metrics) {
+    const body = {
+        resourceMetrics: [{
+            scopeMetrics: [{
+                metrics
+            }]
+        }]
+    };
+    try {
+        await fetch(config.metrics.url, {
+            method: 'POST',
+            headers: {
+                Authorization: config.metrics.apiKey ? `Bearer ${config.metrics.apiKey}` : undefined,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+            });
+        } catch (err) {
+            console.error('Error sending metrics ', err);
+        }
+}
+
+const intervalMs = config.metricsInterval || 60 * 1000;
+
+async function reportAndReset() {
+    try {
+        const snapshot = gatherMetrics();
+        await sendMetrics(snapshot);
+    } finally {
+        totalRequests = 0;
+        Object.keys(requestsByMethod).forEach((k) => requestsByMethod[k] = 0);
+        Object.keys(requestsByEndpoint).forEach((k) => delete requestsByEndpoint[k]);
+        authSuccess = 0;
+        authFailure = 0;
+        pizzasSold = 0;
+        creationFailures = 0;
+        revenueCents = 0;
+        Object.keys(latency).forEach((k) => delete latency[k]);
+    }
+}
+
+setInterval(reportAndReset, intervalMs);
+
+module.export = {
+    requestTracker,
+    recordAuthAttempt,
+    trackActiveUserAdd,
+    trackActiveUserRemove,
+    recordPizzaPurchase,
+    recordCreationFailure,
 }

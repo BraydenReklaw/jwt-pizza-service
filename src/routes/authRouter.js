@@ -82,7 +82,7 @@ authRouter.put(
       const auth = await setAuth(user);   // success metrics handled inside
       return res.json({ user, token: auth });
 
-    } catch (err) {
+    } catch {
       metrics.recordAuthAttempt(false);   // failed login (wrong pw, no user, etc.)
       return res.status(401).json({ message: 'unauthorized' });
     }

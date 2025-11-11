@@ -57,7 +57,7 @@ function trackActiveUserRemove(userId) {
 function recordPizzaPurchase(success, latencyMs = 0, price = 0) {
     if (success) {
         pizzasSold += 1;
-        const cents = Math.round(price * 100) || 0;
+        const cents = price;
         revenueCents += cents;
     } else {
         creationFailures += 1;
@@ -166,22 +166,10 @@ async function sendMetrics(metrics) {
 const intervalMs = config.metricsInterval || 60 * 1000;
 
 async function reportAndReset() {
-    // console.log('Reporting metrics...');
     try {
         const snapshot = gatherMetrics();
         await sendMetrics(snapshot);
-    } finally {
-        totalRequests = 0;
-        Object.keys(requestsByMethod).forEach((k) => requestsByMethod[k] = 0);
-        Object.keys(requestsByEndpoint).forEach((k) => delete requestsByEndpoint[k]);
-        authSuccess = 0;
-        authFailure = 0;
-        pizzasSold = 0;
-        creationFailures = 0;
-        revenueCents = 0;
-        Object.keys(latency).forEach((k) => delete latency[k]);
-    }
-}
+        console.log('Reporting metrics...');
 
 setInterval(reportAndReset, intervalMs);
 

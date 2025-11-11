@@ -1,186 +1,118 @@
-const os = require('os');
 const config = require('./config');
 
-const requestsByEndpoint = {};
-const requestsByMethod = {GET: 0, POST: 0, PUT: 0, DELETE: 0, OTHER: 0}
+const requests = {}
 let totalRequests = 0;
+const methodRequests = { GET: 0, POST: 0, PUT: 0, DELETE: 0};
 
-let authSuccess = 0;
-let authFailure = 0;
+const authAttempts = { success: 0, failure: 0 }
+
 const activeUsers = new Set();
 
-let pizzasSold = 0;
-let creationFailures = 0;
-let revenueCents = 0;
-
-const latency = {};
-
-function recordLatency(endpoint, ms) {
-    const e = latency[endpoint] || {sumMs: 0, count: 0, maxMs: 0}
-    e.sumMs += ms;
-    e.count += 1;
-    if (ms > e.maxMs) e.maxMs = ms;
-    latency[endpoint] = e;
-}
-
 function requestTracker(req, res, next) {
-    const method = (req.method || 'OTHER').toUpperCase();
-    if (requestsByMethod[method] !== undefined) requestsByMethod[method] += 1;
-    else requestsByMethod.OTHER += 1
-    totalRequests += 1;
+    const endpoint = `[${req.method}] ${req.path}`;
+    requests[endpoint] = (requests[endpoint] || 0) + 1;
+    totalRequests++;
+    if (methodRequests[req.method] !== undefined) {
+        methodRequests[req.method]++;
+    } else {
+        methodRequests[req.method] = 1;
+    }
 
-    const endpoint = `[${method}] ${req.path}`
-    requestsByEndpoint[endpoint] = (requestsByEndpoint[endpoint] || 0) +  1;
-
-    const start = Date.now();
-    res.on('finish', () => {
-        const ms = Date.now() - start;
-        recordLatency(endpoint, ms);
-    });
-
+    if (req.user && req.user.userId) {
+        activeUsers.add(req.user.userId);
+    }
     next();
 }
 
-function recordAuthAttempt(success) {
-    if (success) authSuccess += 1;
-    else authFailure += 1;
-}
-
-function trackActiveUserAdd(userId) {
-    if (userId != null) activeUsers.add(String(userId));
-}
-
-function trackActiveUserRemove(userId) {
-    if (userId != null) activeUsers.delete(String(userId));
-}
-
-function recordPizzaPurchase(success, latencyMs = 0, price = 0) {
+function authAttempt(success) {
     if (success) {
-        pizzasSold += 1;
-        const cents = price;
-        revenueCents += cents;
+        authAttempts.success++;
     } else {
-        creationFailures += 1;
+        authAttempts.failure++;
     }
-
-    recordLatency('[FACTORY] /api/order/verify', latencyMs)
 }
 
-function getCpuUsagePercentage() {
-    const load = os.loadavg()[0] || 0;
-    const cpus = os.cpus().length || 1;
-    return Number(((load / cpus) * 100).toFixed(2));
-}
 
-function getMemoryUsagePercentage() {
-    const total = os.totalmem() || 1;
-    const free = os.freemem() || 0;
-    const used = total - free;
-    return Number(((used / total)* 100).toFixed(2))
-}
 
-function createMetric(name, value, unit, type, valueKey, attributes = {}) {
-    attributes = { ...attributes, source: config.source || 'service'};
-    const metric = {
-        name,
-        unit,
-        [type]: {
-            dataPoints: [
-                {
-                    [valueKey]: value,
-                    timeUnixNano: Date.now() * 1e6,
-                    attributes: [],
-                },
-            ],
-        },
-    };
-    Object.keys(attributes).forEach((k) => {
-        metric[type].dataPoints[0].attributes.push({
-            key: k,
-            value: { stringValue: String(attributes[k]) },
-        });
-    });
-    if (type === 'sum') {
-        metric[type].aggregationTemporality = 'AGGREGATION_TEMPORALITY_CUMULATIVE';
-        metric[type].isMonotonic = true;
-    }
-    return metric;
-}
-
-function gatherMetrics() {
+setInterval(() => {
     const metrics = [];
 
-    metrics.push(createMetric('requests_total', totalRequests, '1', 'sum', 'asInt'));
-    Object.keys(requestsByMethod).forEach((m) => {
-        metrics.push(createMetric('requests_by_method', requestsByMethod[m], '1', 'sum', 'asInt', {method: m}));
+    metrics.push(createMetric('totalRequests', totalRequests, '1', 'sum', 'asInt', {}));
+    Object.entries(methodRequests).forEach(([method, count]) => {
+        metrics.push(createMetric('requestsByMethod', count, '1', 'sum', 'asInt', {method}));  
+    })
+    metrics.push(createMetric('activeUsers', activeUsers.size, '1', 'gauge', 'asInt', {}));
+
+    metrics.push(createMetric('authAttemptsSuccess', authAttempts.success, '1', 'sum', 'asInt', {}));
+    metrics.push(createMetric('authAttemptsFailure', authAttempts.failure, '1', 'sum', 'asInt', {}));
+
+    sendMetricToGrafana(metrics)
+    console.log('pushed to grafana')
+}, 15000) //every 15 seconds
+
+function createMetric(metricName, metricValue, metricUnit, metricType, valueType, attributes) {
+  attributes = { ...attributes, source: config.metrics.source };
+
+  const metric = {
+    name: metricName,
+    unit: metricUnit,
+    [metricType]: {
+      dataPoints: [
+        {
+          [valueType]: metricValue,
+          timeUnixNano: Date.now() * 1000000,
+          attributes: [],
+        },
+      ],
+    },
+  };
+
+  Object.keys(attributes).forEach((key) => {
+    metric[metricType].dataPoints[0].attributes.push({
+      key: key,
+      value: { stringValue: attributes[key] },
     });
-    Object.keys(requestsByEndpoint).forEach((ep) => {
-        metrics.push(createMetric('requests_by_endpoint', requestsByEndpoint[ep], '1', 'sum', 'asInt', {endpoint: ep}));    
-    });
+  });
 
-    metrics.push(createMetric('auth_success', authSuccess, '1', 'sum', 'asInt'));
-    metrics.push(createMetric('auth_failure', authFailure, '1', 'sum', 'asInt'));
-    
-    metrics.push(createMetric('active_users', activeUsers.size, '1', 'gauge', 'asInt'));
+  if (metricType === 'sum') {
+    metric[metricType].aggregationTemporality = 'AGGREGATION_TEMPORALITY_CUMULATIVE';
+    metric[metricType].isMonotonic = true;
+  }
 
-    metrics.push(createMetric('pizzas_sold', pizzasSold, '1', 'sum','asInt'));
-    metrics.push(createMetric('pizza_failures', creationFailures, '1', 'sum', 'asInt'));
-    metrics.push(createMetric('revenue', revenueCents, 'cents', 'sum', 'asInt'));
-
-    metrics.push(createMetric('cpu_usage', getCpuUsagePercentage(), 'percent', 'gauge', 'asDouble'));
-    metrics.push(createMetric('memory_usage', getMemoryUsagePercentage(), 'percent', 'gauge', 'asDouble'));
-
-    Object.keys(latency).forEach((ep) => {
-        const {sumMs, count, maxMs} = latency[ep];
-        const avg = count > 0 ? Math.round(sumMs / count) : 0;
-        metrics.push(createMetric('Latency_average', avg, 'ms', 'gauge', 'asInt', {endpoint: ep}));
-        metrics.push(createMetric('latency_max', maxMs, 'ms', 'gauge', 'asInt', {endpoint: ep}));
-        metrics.push(createMetric('Latency_count', count, '1', 'sum', 'asInt', {endpoint: ep}));
-    });
-
-    return metrics;
+  return metric;
 }
 
-async function sendMetrics(metrics) {
-    const body = {
-        resourceMetrics: [{
-            scopeMetrics: [{
-                metrics
-            }]
-        }]
-    };
-    try {
-        await fetch(config.metrics.url, {
-            method: 'POST',
-            headers: {
-                Authorization: config.metrics.apiKey ? `Bearer ${config.metrics.apiKey}` : undefined,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
-            });
-        } catch (err) {
-            console.error('Error sending metrics ', err);
-        }
+function sendMetricToGrafana(metrics) {
+  const body = {
+    resourceMetrics: [
+      {
+        scopeMetrics: [
+          {
+            metrics,
+          },
+        ],
+      },
+    ],
+  };
+
+  fetch(`${config.metrics.url}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { Authorization: `Bearer ${config.metrics.apiKey}`, 'Content-Type': 'application/json' },
+  })
+    .then((response) => {
+        
+      if (!response.ok) {
+        throw new Error(`HTTP status: ${response.status}`);
+      }
+    })
+    .catch((error) => {
+      console.error('Error pushing metrics:', error);
+    });
 }
 
-const intervalMs = config.metricsInterval || 60 * 1000;
-
-async function reportAndReset() {
-    try {
-        const snapshot = gatherMetrics();
-        await sendMetrics(snapshot);
-        console.log('Reporting metrics...');
-
-setInterval(reportAndReset, intervalMs);
 
 module.exports = {
     requestTracker,
-    recordAuthAttempt,
-    trackActiveUserAdd,
-    trackActiveUserRemove,
-    recordPizzaPurchase,
-    gatherMetrics,
-    reportAndReset,
-    getCpuUsagePercentage,
-    getMemoryUsagePercentage
+    recordAuthAttempt: authAttempt,
 }

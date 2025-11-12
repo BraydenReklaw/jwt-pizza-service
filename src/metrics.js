@@ -195,4 +195,9 @@ module.exports = {
     trackActiveUserAdd,
     trackActiveUserRemove,
     recordPizzaPurchase,
+    // testing functions
+    getCpuUsagePercentage,
+    getMemoryUsagePercentage,
+    createMetric,
+    sendMetricToGrafana
 }

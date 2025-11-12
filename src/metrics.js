@@ -123,7 +123,7 @@ setInterval(async () => {
       latencyRecords[endpoint] = { sumMs: 0, count: 0, maxMs: 0 };
     })
     sendMetricToGrafana(metrics)
-    console.log('pushed to grafana')
+    // console.log('pushed to grafana')
     
 }, 15000) //every 15 seconds
 

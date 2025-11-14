@@ -25,9 +25,40 @@ class Logger {
         next();
     };
 
+    db(queryString, params = []) {
+        const logData = {
+            sql: queryString,
+            params: params
+        }
+        this.log('info', 'database', logData)
+    }
+
+    log(level, type, logData) {
+        const labels = {
+            component: config.source,
+            level,
+            type
+        };
+        const sanitized = this.sanitized(logData);
+        const values = [this.nowString(), sanitized];
+
+        const logEvent = {
+            streams: [{
+                stream: labels,
+                values: [values]
+            }]
+        };
+
+        this.sendLogToGrafana(logEvent);
+    }
+
     statusToLogLevel(status) {
         if (status >= 500) return 'error';
         if (status >= 400) return 'warn';
         return 'info';
+    }
+
+    nowString() {
+        return (Math.floor(Date.now()) *  1000000).toString()
     }
 }

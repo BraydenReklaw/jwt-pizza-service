@@ -98,7 +98,7 @@ class Logger {
         redactions.forEach(pattern => {
             str = str.replace(pattern, (match) => {
                 const key = match.split(':')[0];
-                return `${key}: "${this.sanitized}`
+                return `${key}: "${this.sanitized}"`
             })
         })
 

@@ -6,6 +6,7 @@ const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
 
 const orderRouter = express.Router();
 const metrics = require('../metrics')
+const logger = require('../logger');
 
 orderRouter.docs = [
   {
@@ -82,12 +83,16 @@ orderRouter.post(
     const start = Date.now();
     try{
       const order = await DB.addDinerOrder(req.user, orderReq);
+      const factoryReqBody = { diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }
       const r = await fetch(`${config.factory.url}/api/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
-        body: JSON.stringify({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }),
+        body: JSON.stringify(factoryReqBody),
       });
       const j = await r.json();
+
+      logger.factoryRequest(`${config.factory.url}/api/order`, factoryReqBody, j, r.status );
+
       const latencyMs = Date.now() - start;
       if (r.ok) {
         const total = order.items.reduce((sum, item) => sum + item.price, 0);

@@ -1,4 +1,4 @@
-const config = require('./config.json')
+const config = require('./config.js')
 
 class Logger {
     constructor() {
@@ -26,9 +26,10 @@ class Logger {
     };
 
     db(queryString, params = []) {
+        const sanitizedParams = params.map(() => this.sanitized);
         const logData = {
             sql: queryString,
-            params: params
+            params: sanitizedParams
         }
         this.log('info', 'database', logData)
     }
@@ -57,7 +58,7 @@ class Logger {
 
     log(level, type, logData) {
         const labels = {
-            component: config.source,
+            component: config.logging.source,
             level,
             type
         };
@@ -92,7 +93,8 @@ class Logger {
             /"token"\s*:\s*"[^"]*"/gi,
             /"authorization"\s*:\s*"[^"]*"/gi,
             /"auth"\s*:\s*"[^"]*"/gi,
-            /"email"\s*:\s*"[^"]*"/gi  
+            /"email"\s*:\s*"[^"]*"/gi,
+            /"name"\s*:\s*"[^"]*"/gi  
         ];
 
         redactions.forEach(pattern => {
@@ -107,12 +109,12 @@ class Logger {
 
     sendLogToGrafana(event) {
         const body = JSON.stringify(event);
-        fetch(`${config.url}`, {
+        fetch(`${config.logging.url}`, {
             method: 'post',
             body: body,
             headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.userId}:${config.apiKey}`,
+            Authorization: `Bearer ${config.logging.userId}:${config.logging.apiKey}`,
             },
         }).then((res) => {
             if (!res.ok) console.log('Failed to send log to Grafana');

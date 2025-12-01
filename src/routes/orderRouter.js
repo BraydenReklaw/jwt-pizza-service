@@ -41,7 +41,7 @@ orderRouter.docs = [
     response: { order: { franchiseId: 1, storeId: 1, items: [{ menuId: 1, description: 'Veggie', price: 0.05 }], id: 1 }, jwt: '1111111111' },
   },
 ];
-// chaos code
+// chaos code (haha)
 let enableChaos = false;
 orderRouter.put(
   '/chaos/:state',
